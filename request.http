@@ -1,0 +1,16 @@
+### Test 1 : Commentaire valide
+POST http://localhost:8083/api/moderation/check
+Content-Type: application/json
+
+{
+  "text": "Ce praticien est très à l'écoute et ponctuel."
+}
+
+### Test 2 : Commentaire avec mot interdit
+# (Remplace "MOT_INTERDIT" par un mot de ton fichier bad_words.txt)
+POST http://localhost:8083/api/moderation/check
+Content-Type: application/json
+
+{
+  "text": "Ce médecin est un vrai con, à fuir absolument."
+}
