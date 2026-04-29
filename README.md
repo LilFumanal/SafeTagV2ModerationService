@@ -1,26 +1,31 @@
-# Moderation Service 🛡️
+# Moderation Service - SafeTag
 
-## Rôle
-Ce microservice gère la modération des contenus sur la plateforme SafeTag. Il centralise les signalements des utilisateurs et l'application des décisions de modération (ex: validation ou rejet d'un avis).
+## Rôle du service
+Ce microservice est responsable de la modération des avis sur la plateforme SafeTag. 
+Il gère le workflow de vérification (signalement, approbation, rejet) et maintient une trace d'audit complète des décisions de modération.
 
-## Responsabilités
-- **Signalements** : Réception et stockage des rapports émis par les utilisateurs.
-- **Décisions** : Traitement des actions de modération.
-- **Synchronisation** : Mise à jour de l'état des contenus dans les autres services.
+## Faits & Fonctionnalités
+- **Modération automatique :** Vérification à la volée du contenu textuel (détection de mots bannis/insultes) avant même la création de l'avis.
+- **Cycle de vie des avis :** Pilote la transition des statuts (`PENDING` -> `APPROVED` ou `REJECTED`).
+- **Historisation :** Stocke chaque action dans une table `ModerationHistory` (Action, Raison, Opérateur, Timestamp).
+- **Communication sortante :** Ordonne au `review-service` de modifier le statut des avis via des appels internes.
 
 ## Architecture & Communication
+- **Gateway :** L'authentification est déléguée à la Gateway, qui injecte le rôle de l'utilisateur dans le header HTTP `X-User-Role`.
+- **Review Service :** La communication interne se fait actuellement via `RestTemplate` (appels HTTP synchrones REST). 
 
-- **API Publique** : Accessible via la Gateway (`/api/v1/moderation/**`).
-- **Communication inter-services** : 
-  - Actuellement : Appels HTTP synchrones (via `RestTemplate`) vers les APIs internes des autres services (ex: `/api/internal/reviews/{id}/reject` sur le `review-service`).
-  - *Évolution prévue* : Transition vers un Message Broker pour assurer un couplage lâche et asynchrone.
-- **Sécurité** : Les actions de modération nécessitent une validation des droits (via la Gateway/JWT).
+*Hypothèse d'évolution :* Le passage de `RestTemplate` vers un Message Broker (ex: RabbitMQ) est documenté mais différé pour éviter l'over-engineering initial.
 
-## Endpoints Principaux (Exemples)
-- `POST /api/v1/moderation/reports` : Soumettre un signalement (Utilisateur).
-- `POST /api/v1/moderation/reviews/{id}/reject` : Appliquer un rejet sur un avis (Modérateur).
+## Endpoints Principaux (API REST)
 
-## Configuration
-- **Port local** : `8083`
-- **Variables d'environnement requises** :
-  - `REVIEW_SERVICE_URL` : URL de base pour joindre le Review Service (ex: `http://localhost:8083`).
+| Méthode | Endpoint | Rôles requis (Header) | Description |
+|---|---|---|---|
+| `POST` | `/api/v1/moderation/reviews/{reviewId}/approve` | `MODERATOR`, `ADMIN` | Valide un avis (déclenche l'appel au review-service) |
+| `POST` | `/api/v1/moderation/reviews/{reviewId}/reject` | `MODERATOR`, `ADMIN` | Rejette un avis avec un motif |
+| `POST` | `/api/v1/moderation/reviews/{reviewId}/report` | `USER` | Signale un avis (passe en `PENDING`) |
+| `POST` | `/api/v1/moderation/text/check` | `USER` (ou public) | Vérifie un texte à la volée (détection de mots bannis) |
+
+
+## Décisions Techniques (Decision Log)
+1. **Sécurité pragmatique :** Pas de validation JWT dans ce service. Il fait confiance au header `X-User-Role` fourni par l'API Gateway de SafeTag.
+2. **Séparation des données :** La donnée froide/historique reste ici (`ModerationHistory`), la donnée chaude (`Review`) reste dans le `review-service`.
