@@ -1,5 +1,8 @@
 package com.lil.safetagmoderationservice.service;
 
+import com.lil.safetagmoderationservice.dto.ReviewStatus;
+import com.lil.safetagmoderationservice.entity.ModerationLog;
+import com.lil.safetagmoderationservice.repository.ModerationLogRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,16 +14,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class ModerationService {
     private final RestTemplate restTemplate;
-    @Value("${app.services.review.url}")
+    @Value("${REVIEW_SERVICE_URL}")
     private String reviewServiceUrl;
+    private final ModerationLogRepository moderationLogRepository;
     private final Set<String> badWords = new HashSet<>();
 
-    public ModerationService(RestTemplate restTemplate) {
+    public ModerationService(RestTemplate restTemplate, ModerationLogRepository moderationLogRepository) {
         this.restTemplate = restTemplate;
+        this.moderationLogRepository = moderationLogRepository;
     }
 
     @PostConstruct
@@ -40,9 +46,9 @@ public class ModerationService {
         }
     }
 
-    public String moderateComment(String text) {
+    public ReviewStatus moderateComment(String text) {
         if (text == null || text.isBlank()) {
-            return "REJECTED";
+            return ReviewStatus.REJECTED;
         }
 
         String lowerCaseText = text.toLowerCase();
@@ -50,12 +56,25 @@ public class ModerationService {
 
         // Si on trouve un gros mot, on l'envoie en file d'attente.
         // (Tu peux mettre "REJECTED" si tu préfères un blocage strict).
-        return containsBadWords ? "REJECTED" : "APPROVED";
+        return containsBadWords ? ReviewStatus.REJECTED : ReviewStatus.APPROVED;
     }
 
-    public void processRejection(Long reviewId, String reason) {
-        Map<String, String> payload = Map.of("rejectionReason", reason);
-        String targetUrl = reviewServiceUrl + "/" + reviewId + "/reject";
-        restTemplate.postForLocation(targetUrl, payload);
+    public void processRejection(UUID reviewId, String reason) {
+        moderationLogRepository.save(new ModerationLog(reviewId, "REJECTED", reason));
+        String targetUrl = reviewServiceUrl + "api/v1/internal/reviews/" + reviewId + "/reject?reason=" + reason;
+        restTemplate.postForLocation(targetUrl, null);
+    }
+
+    public void processRevision(UUID reviewId) {
+        moderationLogRepository.save(new ModerationLog(reviewId, "PENDING", "User modified the review"));
+        String targetUrl = reviewServiceUrl + "api/v1/internal/reviews/" + reviewId + "/pending";
+        restTemplate.postForLocation(targetUrl, null);
+    }
+
+    // 2. Quand un modérateur valide l'avis
+    public void processApproval(UUID reviewId) {
+        moderationLogRepository.save(new ModerationLog(reviewId, "APPROVED", "Approved by moderator"));
+        String targetUrl = reviewServiceUrl + "api/v1/internal/reviews/" + reviewId + "/approve";
+        restTemplate.postForLocation(targetUrl, null);
     }
 }

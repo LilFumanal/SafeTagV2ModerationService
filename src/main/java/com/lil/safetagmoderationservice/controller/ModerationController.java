@@ -2,10 +2,12 @@ package com.lil.safetagmoderationservice.controller;
 
 import com.lil.safetagmoderationservice.dto.RejectRequest;
 import com.lil.safetagmoderationservice.service.ModerationService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/moderation")
@@ -28,15 +30,32 @@ public class ModerationController {
         return ResponseEntity.ok(new ModerationResponse(status));
     }
 
-    @PostMapping("/reviews/{id}/reject")
+    @PostMapping("/{reviewId}/reject")
     public ResponseEntity<Void> rejectReview(
-            @PathVariable Long id,
-            @RequestBody RejectRequest request) {
-
-        // On délègue la logique au service de modération
+            @PathVariable UUID id,
+            @RequestBody RejectRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+        if (!"MODERATOR".equals(userRole) && !"ADMIN".equals(userRole)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         moderationService.processRejection(id, request.rejectionReason());
 
         return ResponseEntity.ok().build();
     }
+    @PostMapping("/{reviewId}/pending")
+    public ResponseEntity<Void> markAsPending(@PathVariable UUID reviewId) {
+        moderationService.processRevision(reviewId);
+        return ResponseEntity.ok().build();
+    }
 
+    @PostMapping("/{reviewId}/approve")
+    public ResponseEntity<Void> approveReview(
+            @PathVariable UUID reviewId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
+        if (!"MODERATOR".equals(userRole) && !"ADMIN".equals(userRole)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        moderationService.processApproval(reviewId);
+        return ResponseEntity.ok().build();
+    }
 }
