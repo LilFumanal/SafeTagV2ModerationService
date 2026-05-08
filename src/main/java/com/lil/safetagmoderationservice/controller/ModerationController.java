@@ -1,6 +1,7 @@
 package com.lil.safetagmoderationservice.controller;
 
 import com.lil.safetagmoderationservice.dto.RejectRequest;
+import com.lil.safetagmoderationservice.dto.ReviewStatus;
 import com.lil.safetagmoderationservice.service.ModerationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,12 +22,12 @@ public class ModerationController {
 
     // Utilisation des Records (Java 14+) pour simplifier les objets de transfert
     public record ModerationRequest(String text) {}
-    public record ModerationResponse(String status) {}
+    public record ModerationResponse(ReviewStatus status) {}
 
     @PostMapping("/check")
     public ResponseEntity<ModerationResponse> checkText(@RequestBody ModerationRequest request) {
         // On appelle la nouvelle méthode
-        String status = moderationService.moderateComment(request.text());
+        ReviewStatus status = moderationService.moderateComment(request.text());
         return ResponseEntity.ok(new ModerationResponse(status));
     }
 
