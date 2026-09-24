@@ -19,7 +19,7 @@ import java.util.UUID;
 @Service
 public class ModerationService {
     private final RestTemplate restTemplate;
-    @Value("${REVIEW_SERVICE_URL}")
+    @Value("${app.services.review.url}")
     private String reviewServiceUrl;
     private final ModerationLogRepository moderationLogRepository;
     private final Set<String> badWords = new HashSet<>();

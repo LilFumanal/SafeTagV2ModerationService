@@ -4,3 +4,12 @@ app:
   services:
     review:
       url: ${REVIEW_SERVICE_URL:http://localhost:8082}/api/v1/internal/reviews
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/safetag_moderation
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
